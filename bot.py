@@ -2,10 +2,11 @@ import os
 import discord
 import discord
 from discord import app_commands
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
-# 한국 시간대(KST, UTC+9) 설정
-KST = timezone(timedelta(hours=9))
+# 한국 시간(UTC + 9시간)을 계산하는 함수
+def get_kst_now():
+    return datetime.utcnow() + timedelta(hours=9)
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
@@ -22,7 +23,7 @@ async def on_ready():
 @tree.command(name="출근", description="오늘의 출근을 기록합니다.")
 async def clock_in(interaction: discord.Interaction):
     user_id = interaction.user.id
-    now = datetime.now(KST)
+    now = get_kst_now()
     
     if user_id in work_sessions:
         await interaction.response.send_message("⚠️ 이미 출근 상태입니다! 먼저 퇴근해주세요.", ephemeral=True)
