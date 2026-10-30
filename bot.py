@@ -1,12 +1,14 @@
 import os
 import discord
-import discord
 from discord import app_commands
 from datetime import datetime, timedelta
+from flask import Flask
+from threading import Thread
 
 # 한국 시간(UTC + 9시간)을 계산하는 함수
 def get_kst_now():
     return datetime.utcnow() + timedelta(hours=9)
+
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
@@ -47,7 +49,7 @@ async def clock_in(interaction: discord.Interaction):
 @tree.command(name="퇴근", description="퇴근을 기록하고 총 근무 시간을 확인합니다.")
 async def clock_out(interaction: discord.Interaction):
     user_id = interaction.user.id
-    now = datetime.now()
+    now = get_kst_now()  # 👈 퇴근 시간도 한국 시간(KST)으로 수정 완료!
     
     if user_id not in work_sessions:
         await interaction.response.send_message("⚠️ 아직 출근하지 않았거나 이미 퇴근하셨습니다!", ephemeral=True)
@@ -83,4 +85,20 @@ async def check_attendance(interaction: discord.Interaction):
         ephemeral=True
     )
 
-client.run(os.getenv('TOKEN'))
+# 렌더 포트 에러 방지용 가벼운 웹 서버 (Flask)
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
+if __name__ == "__main__":
+    keep_alive()
+    client.run(os.getenv('TOKEN'))
