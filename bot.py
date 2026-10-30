@@ -78,4 +78,4 @@ async def check_attendance(interaction: discord.Interaction):
         ephemeral=True
     )
 
-client.run('')
+client.run(os.getenv('TOKEN'))
