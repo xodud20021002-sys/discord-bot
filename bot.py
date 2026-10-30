@@ -1,3 +1,5 @@
+import os
+import discord
 import discord
 from discord import app_commands
 from datetime import datetime
