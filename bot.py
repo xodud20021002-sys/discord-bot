@@ -15,7 +15,7 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 work_sessions = {}
-attendance_records = {}
+attendance_records = {}  # 구조 변경: 사용자별로 출석 날짜(datetime 객체) 리스트를 저장
 
 @client.event
 async def on_ready():
@@ -32,15 +32,16 @@ async def clock_in(interaction: discord.Interaction):
         return
     
     work_sessions[user_id] = now
-    time_str = now.strftime("%Y년 %m월 %d일 %H시 %M분 %S초")
     
+    # 사용자 기록 초기화 (없으면 리스트 생성)
     if user_id not in attendance_records:
-        attendance_records[user_id] = {"count": 0, "last_date": time_str}
+        attendance_records[user_id] = []
     
-    attendance_records[user_id]["count"] += 1
-    attendance_records[user_id]["last_date"] = time_str
+    # 출석 시간(datetime)을 리스트에 추가
+    attendance_records[user_id].append(now)
     
-    total_count = attendance_records[user_id]["count"]
+    total_count = len(attendance_records[user_id])
+    time_str = now.strftime("%Y년 %m월 %d일 %H시 %M분 %S초")
     
     await interaction.response.send_message(
         f"🟢 [출근 완료] {interaction.user.mention}님, 좋은 하루입니다!\n⏱️ 출근 시간: {time_str}\n📊 누적 출석 횟수: {total_count}회"
@@ -49,7 +50,7 @@ async def clock_in(interaction: discord.Interaction):
 @tree.command(name="퇴근", description="퇴근을 기록하고 총 근무 시간을 확인합니다.")
 async def clock_out(interaction: discord.Interaction):
     user_id = interaction.user.id
-    now = get_kst_now()  # 👈 퇴근 시간도 한국 시간(KST)으로 수정 완료!
+    now = get_kst_now()
     
     if user_id not in work_sessions:
         await interaction.response.send_message("⚠️ 아직 출근하지 않았거나 이미 퇴근하셨습니다!", ephemeral=True)
@@ -69,19 +70,31 @@ async def clock_out(interaction: discord.Interaction):
         f"🔴 [퇴근 완료] {interaction.user.mention}님, 수고하셨습니다!\n⏱️ 퇴근 시간: {out_time_str}\n⌛ 총 근무 시간: {hours}시간 {minutes}분 {seconds}초"
     )
 
-@tree.command(name="출석확인", description="나의 누적 출석 횟수와 최근 출근 기록을 확인합니다.")
+@tree.command(name="출석확인", description="최근 7일간의 누적 출석 기록을 확인합니다.")
 async def check_attendance(interaction: discord.Interaction):
     user_id = interaction.user.id
     
-    if user_id not in attendance_records or attendance_records[user_id]["count"] == 0:
+    if user_id not in attendance_records or not attendance_records[user_id]:
         await interaction.response.send_message("📊 아직 출석 기록이 없습니다. /출근 명령어를 사용해 보세요!", ephemeral=True)
         return
     
-    c = attendance_records[user_id]["count"]
-    d = attendance_records[user_id]["last_date"]
+    now = get_kst_now()
+    seven_days_ago = now - timedelta(days=7)
+    
+    # 최근 7일 이내의 기록만 필터링
+    recent_records = [t for t in attendance_records[user_id] if t >= seven_days_ago]
+    
+    total_count = len(attendance_records[user_id])
+    
+    if not recent_records:
+        await interaction.response.send_message(f"📋 [{interaction.user.name}님의 출석 현황]\n📊 누적 출석 횟수: {total_count}회\n⚠️ 최근 7일 이내 출석 기록이 없습니다.", ephemeral=True)
+        return
+    
+    # 보기 쉽게 문자열 목록으로 변환
+    history_str = "\n".join([f"• {t.strftime('%Y년 %m월 %d일 %H시 %M분')}" for t in recent_records])
     
     await interaction.response.send_message(
-        f"📋 [{interaction.user.name}님의 출석 현황]\n📊 누적 출석 횟수: {c}회\n🕒 최근 출석 일시: {d}",
+        f"📋 [{interaction.user.name}님의 출석 현황 (최근 7일)]\n📊 총 누적 출석: {total_count}회\n\n🕒 **최근 7일간 출석 내역:**\n{history_str}",
         ephemeral=True
     )
 
